@@ -351,6 +351,46 @@
     background: rgba(4,6,12,.6);
     z-index:12;
   }
+  .intro-panel{
+    position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+    pointer-events:none; opacity:0; transition: opacity .25s ease;
+    background: rgba(4,6,12,.75);
+    z-index:30;
+  }
+  .intro-panel.active{ pointer-events:auto; opacity:1; }
+  .intro-box{
+    background: linear-gradient(180deg, rgba(10,16,30,.98), rgba(6,10,20,.98));
+    border:1px solid rgba(25,247,255,.35);
+    box-shadow: 0 0 28px rgba(25,247,255,.25);
+    padding:18px 20px; border-radius:14px; width:min(860px, 94vw);
+  }
+  .slides{
+    display:flex; gap:16px; overflow-x:auto; scroll-snap-type:x mandatory;
+    padding:12px 6px; scroll-behavior:smooth;
+  }
+  .slide{
+    min-width:80vw; max-width:80vw; scroll-snap-align:center;
+    background: rgba(25,247,255,.06);
+    border:1px solid rgba(25,247,255,.25);
+    border-radius:12px; padding:14px 16px;
+    text-transform:uppercase; letter-spacing:1px;
+  }
+  .slide h3{
+    margin:0 0 6px 0; font-size:14px; color:var(--neon);
+  }
+  .slide p{
+    margin:6px 0; font-size:11px; opacity:.85;
+  }
+  .slide .hint{ font-size:10px; }
+  .slide-controls{
+    display:flex; align-items:center; justify-content:space-between; margin-top:8px;
+  }
+  .dots{ display:flex; gap:6px; }
+  .dot{
+    width:8px; height:8px; border-radius:50%;
+    border:1px solid rgba(25,247,255,.5); opacity:.4;
+  }
+  .dot.active{ opacity:1; background: rgba(25,247,255,.7); }
   .breakdown-panel.active{ pointer-events:auto; opacity:1; }
   .breakdown-box{
     background: linear-gradient(180deg, rgba(10,16,30,.95), rgba(6,10,20,.95));
@@ -511,6 +551,56 @@
   </div>
 </div>
 
+<div id="introPanel" class="intro-panel">
+  <div class="intro-box">
+    <div class="title">How To Play</div>
+    <div id="slides" class="slides">
+      <div class="slide">
+        <h3>Core Goal</h3>
+        <p>Move left and right to slip through neon gates.</p>
+        <p>Survive as long as possible and chase high intensity.</p>
+      </div>
+      <div class="slide">
+        <h3>Controls</h3>
+        <p>Keyboard: Left/Right (rebind in Upgrades).</p>
+        <p>Touch: drag or tap to set a target.</p>
+        <p>P or Esc to pause.</p>
+      </div>
+      <div class="slide">
+        <h3>Scoring</h3>
+        <p>Center passes = PERFECT bonus.</p>
+        <p>Edge passes = RISK bonus and near-miss glow.</p>
+        <p>Combo builds on clean passes, decays over time.</p>
+      </div>
+      <div class="slide">
+        <h3>Modifiers</h3>
+        <p>Each run has 1 positive + 1 negative modifier.</p>
+        <p>They change feel, never make it unfair.</p>
+        <p class="hint">Positive: Hyper Drift, Echo Gates, Flow Assist.</p>
+        <p class="hint">Negative: Tight Slip, Mirror Bias, Pulse Locks.</p>
+      </div>
+      <div class="slide">
+        <h3>Progression</h3>
+        <p>Earn Neon Shards from score, near-misses, combos.</p>
+        <p>Spend in Upgrades for better clarity and feel.</p>
+      </div>
+      <div class="slide">
+        <h3>Settings</h3>
+        <p>Adjust music/SFX, shake, motion intensity.</p>
+        <p>Color-blind and streamer modes available.</p>
+      </div>
+    </div>
+    <div class="slide-controls">
+      <div class="btn" id="prevSlide">Prev</div>
+      <div class="dots" id="slideDots"></div>
+      <div class="btn" id="nextSlide">Next</div>
+    </div>
+    <div class="settings-actions">
+      <div id="closeIntro" class="btn">Start Run</div>
+    </div>
+  </div>
+</div>
+
 <div class="itch-embed">
   <iframe frameborder="0" src="https://itch.io/embed/4157033" width="552" height="167"><a href="https://247-gamer.itch.io/neon-slip">NEON Slip by 24.7-GAMER</a></iframe>
 </div>
@@ -572,6 +662,12 @@
   const breakdownPanelEl = document.getElementById("breakdownPanel");
   const breakdownStatsEl = document.getElementById("breakdownStats");
   const closeBreakdownEl = document.getElementById("closeBreakdown");
+  const introPanelEl = document.getElementById("introPanel");
+  const slidesEl = document.getElementById("slides");
+  const prevSlideEl = document.getElementById("prevSlide");
+  const nextSlideEl = document.getElementById("nextSlide");
+  const slideDotsEl = document.getElementById("slideDots");
+  const closeIntroEl = document.getElementById("closeIntro");
 
   let w, h, dpr;
   function resize(){
@@ -636,7 +732,9 @@
     rebind: { left: "KeyA", right: "KeyD" },
     awaitingBind: null,
     upgradeEffects: { controlBoost: 1, comboExtend: 1, glowBoost: 1, trailShift: 0, gatePulse: 0 },
-    announceCooldown: 0
+    announceCooldown: 0,
+    introRequired: true,
+    slideIndex: 0
   };
 
   const player = {
@@ -993,6 +1091,43 @@
     }
   }
 
+  function initIntro(){
+    slideDotsEl.innerHTML = "";
+    const slides = slidesEl.children;
+    for (let i = 0; i < slides.length; i++){
+      const dot = document.createElement("div");
+      dot.className = "dot" + (i === 0 ? " active" : "");
+      slideDotsEl.appendChild(dot);
+    }
+  }
+
+  function slideStep(){
+    const slide = slidesEl.children[0];
+    if (!slide) return slidesEl.clientWidth;
+    const styles = window.getComputedStyle(slidesEl);
+    const gap = parseFloat(styles.gap || styles.columnGap || "0");
+    return slide.offsetWidth + gap;
+  }
+
+  function updateIntroDots(){
+    const dots = slideDotsEl.children;
+    for (let i = 0; i < dots.length; i++){
+      dots[i].classList.toggle("active", i === state.slideIndex);
+    }
+  }
+
+  function setSlide(index){
+    const count = slidesEl.children.length;
+    const clamped = Math.max(0, Math.min(count - 1, index));
+    state.slideIndex = clamped;
+    slidesEl.scrollTo({ left: clamped * slideStep(), behavior: "smooth" });
+    updateIntroDots();
+  }
+
+  function scrollToSlide(dir){
+    setSlide(state.slideIndex + dir);
+  }
+
   function saveSettings(){
     localStorage.setItem("neonSettings", JSON.stringify(SETTINGS));
   }
@@ -1202,6 +1337,10 @@
   function startGame(){
     initAudio();
     unlockAudio();
+    if (state.introRequired){
+      introPanelEl.classList.add("active");
+      return;
+    }
     resetGame();
     state.flash = 0.06;
     state.zoom = 0.01;
@@ -2230,10 +2369,32 @@
     state.awaitingBind = "right";
     rebindRightEl.textContent = "Press key...";
   });
+  prevSlideEl.addEventListener("click", () => {
+    scrollToSlide(-1);
+  });
+  nextSlideEl.addEventListener("click", () => {
+    scrollToSlide(1);
+  });
+  closeIntroEl.addEventListener("click", () => {
+    state.introRequired = false;
+    localStorage.setItem("neonIntroSeen", "1");
+    introPanelEl.classList.remove("active");
+    startGame();
+  });
+  slidesEl.addEventListener("scroll", () => {
+    const idx = Math.round(slidesEl.scrollLeft / slideStep());
+    if (idx !== state.slideIndex){
+      state.slideIndex = idx;
+      updateIntroDots();
+    }
+  });
 
   resize();
   loadSettings();
   loadProgress();
+  initIntro();
+  state.introRequired = localStorage.getItem("neonIntroSeen") !== "1";
+  setSlide(0);
   setMode("start");
   startPanel.classList.add("enter");
   setTimeout(() => startPanel.classList.remove("enter"), 600);
