@@ -2472,7 +2472,6 @@
   });
   closeIntroEl.addEventListener("click", () => {
     state.introRequired = false;
-    localStorage.setItem("neonIntroSeen", "1");
     introPanelEl.classList.remove("active");
     startGame();
   });
@@ -2488,7 +2487,7 @@
   loadSettings();
   loadProgress();
   initIntro();
-  state.introRequired = localStorage.getItem("neonIntroSeen") !== "1";
+  state.introRequired = true;
   setSlide(0);
   setMode("start");
   startPanel.classList.add("enter");
